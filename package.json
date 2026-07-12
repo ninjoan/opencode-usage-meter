@@ -1,0 +1,60 @@
+{
+  "name": "opencode-cli-usage-meter",
+  "version": "0.0.0",
+  "description": "Standalone OpenCode TUI plugin that displays CLI usage in the sidebar.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/tui.js",
+  "types": "./dist/tui.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/tui.d.ts",
+      "import": "./dist/tui.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./dist/tui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "packageManager": "pnpm@11.2.0",
+  "private": false,
+  "scripts": {
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "build": "tsup",
+    "smoke:consumer": "node --input-type=module -e \"import{execFileSync}from'node:child_process';import{mkdtemp,rm,writeFile}from'node:fs/promises';import{tmpdir}from'node:os';import{join}from'node:path';const name='opencode-cli-usage-meter',windows=process.platform==='win32',npm=windows?'npm.cmd':'npm',root=await mkdtemp(join(tmpdir(),'usage-meter-consumer-'));try{const[{filename}]=JSON.parse(execFileSync(npm,['pack','--json','--ignore-scripts','--pack-destination',root],{encoding:'utf8',shell:windows}));await writeFile(join(root,'package.json'),JSON.stringify({private:true,type:'module'}));execFileSync(npm,['install','--offline','--ignore-scripts','--legacy-peer-deps',join(root,filename)],{cwd:root,stdio:'inherit',shell:windows});const quoted=JSON.stringify(name),check='for(const specifier of['+quoted+','+JSON.stringify(name+'/tui')+']){const module=await import(specifier);if(module.default?.id!=='+quoted+'||typeof module.default?.tui!==\\\"function\\\")throw new Error(\\\"Invalid plugin export: \\\"+specifier)}';await writeFile(join(root,'smoke.mjs'),check);execFileSync(process.execPath,['smoke.mjs'],{cwd:root,stdio:'inherit'})}finally{await rm(root,{recursive:true,force:true})}\"",
+    "pack:dry-run": "pnpm pack --dry-run",
+    "audit:prod": "pnpm audit --prod"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.17.18 <2",
+    "@opentui/core": ">=0.4.3 <0.5",
+    "@opentui/solid": ">=0.4.3 <0.5",
+    "solid-js": ">=1.9.12 <2"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "1.17.18",
+    "@opentui/core": "0.4.3",
+    "@opentui/solid": "0.4.3",
+    "@solidjs/testing-library": "^0.8.10",
+    "@types/babel__core": "^7.20.5",
+    "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "esbuild-plugin-solid": "^0.6.0",
+    "jsdom": "^29.1.1",
+    "solid-js": "^1.9.14",
+    "tsup": "^8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.10"
+  }
+}
