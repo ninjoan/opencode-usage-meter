@@ -68,7 +68,8 @@ describe("package export and runtime contract", () => {
     expect(scripts["smoke:consumer"]).toMatch(/^node --input-type=module -e /);
     expect(scripts["smoke:consumer"]).toMatch(/^node --input-type=module -e "/);
     expect(scripts["smoke:consumer"]).not.toMatch(/^node --input-type=module -e '/);
-    expect(scripts["smoke:consumer"]).toMatch(/['"]--offline['"],['"]--ignore-scripts['"]/);
+    expect(scripts["smoke:consumer"]).not.toContain("--offline");
+    expect(scripts["smoke:consumer"]).toMatch(/['"]--ignore-scripts['"]/);
     expect(scripts["smoke:consumer"]).toMatch(/name\+['"]\/tui['"]/);
     expect(scripts["smoke:consumer"]).toContain("finally{");
     expect(scripts["smoke:consumer"]).not.toContain("tests/compat/consumer-smoke.mjs");

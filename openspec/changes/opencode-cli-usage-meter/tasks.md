@@ -35,10 +35,10 @@ Chain strategy: stacked-to-main
 - [x] 1.4 REFACTOR: wire `pnpm {typecheck,test,build,audit:prod}` and frozen/ignore-scripts CI install.
 
 ## Phase 2: Codex Core Slice
-- [ ] 2.1 RED: add `tests/transport/process.spec.ts` and `tests/security/{no-shell,no-auth-readers,no-http}.spec.ts` for safe args, minimal env, timeout/cancel, and single-flight.
-- [ ] 2.2 GREEN: implement `src/{transport/process.ts,domain/usage.ts,state/cache.ts,scheduler/refresh.ts,gates/provider-gates.ts,diagnostics/redaction.ts}`.
-- [ ] 2.3 RED: add `tests/parsers/codex/v1.spec.ts`, `tests/providers/codex.spec.ts`, and `tests/component/sidebar-codex.spec.tsx` for `/status`, cadence, order, and exact `Data unavailable`.
-- [ ] 2.4 GREEN/REFACTOR: implement `src/{parsers/codex/v1.ts,providers/codex.ts,ui/sidebar.tsx,ui/sidebar-section.tsx,disposal/index.ts}`.
+- [x] 2.1 RED: add `tests/transport/process.spec.ts` and `tests/security/{no-shell,no-auth-readers,no-http}.spec.ts` for safe args, minimal env, timeout/cancel, and single-flight.
+- [x] 2.2 GREEN: implement `src/{transport/process.ts,domain/usage.ts,state/cache.ts,scheduler/refresh.ts,gates/provider-gates.ts,diagnostics/redaction.ts}`.
+- [x] 2.3 RED: add `tests/parsers/codex/v1.spec.ts`, `tests/providers/codex.spec.ts`, and `tests/component/sidebar-codex.spec.tsx` for `/status`, cadence, order, and exact `Data unavailable`.
+- [x] 2.4 GREEN/REFACTOR: implement `src/{parsers/codex/v1.ts,providers/codex.ts,ui/sidebar.tsx,ui/sidebar-section.tsx,disposal/index.ts}`.
 
 ## Phase 3: Claude, UI Hardening, Optional PTY
 - [ ] 3.1 RED: add `tests/parsers/claude/v1.spec.ts`, `tests/providers/claude.spec.ts`, and `tests/transport/pty-decision.spec.ts` proving pipes fail before any `src/transport/pty.ts` lands.
