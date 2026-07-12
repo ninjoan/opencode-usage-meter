@@ -32,7 +32,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "build": "tsup",
-    "smoke:consumer": "node --input-type=module -e \"import{execFileSync}from'node:child_process';import{mkdtemp,rm,writeFile}from'node:fs/promises';import{tmpdir}from'node:os';import{join}from'node:path';const name='opencode-cli-usage-meter',windows=process.platform==='win32',npm=windows?'npm.cmd':'npm',root=await mkdtemp(join(tmpdir(),'usage-meter-consumer-'));try{const[{filename}]=JSON.parse(execFileSync(npm,['pack','--json','--ignore-scripts','--pack-destination',root],{encoding:'utf8',shell:windows}));await writeFile(join(root,'package.json'),JSON.stringify({private:true,type:'module'}));execFileSync(npm,['install','--offline','--ignore-scripts','--legacy-peer-deps',join(root,filename)],{cwd:root,stdio:'inherit',shell:windows});const quoted=JSON.stringify(name),check='for(const specifier of['+quoted+','+JSON.stringify(name+'/tui')+']){const module=await import(specifier);if(module.default?.id!=='+quoted+'||typeof module.default?.tui!==\\\"function\\\")throw new Error(\\\"Invalid plugin export: \\\"+specifier)}';await writeFile(join(root,'smoke.mjs'),check);execFileSync(process.execPath,['smoke.mjs'],{cwd:root,stdio:'inherit'})}finally{await rm(root,{recursive:true,force:true})}\"",
+    "smoke:consumer": "node --input-type=module -e \"import{execFileSync}from'node:child_process';import{mkdtemp,rm,writeFile}from'node:fs/promises';import{tmpdir}from'node:os';import{join}from'node:path';const name='opencode-cli-usage-meter',windows=process.platform==='win32',npm=windows?'npm.cmd':'npm',root=await mkdtemp(join(tmpdir(),'usage-meter-consumer-'));try{const[{filename}]=JSON.parse(execFileSync(npm,['pack','--json','--ignore-scripts','--pack-destination',root],{encoding:'utf8',shell:windows}));await writeFile(join(root,'package.json'),JSON.stringify({private:true,type:'module'}));execFileSync(npm,['install','--ignore-scripts',join(root,filename)],{cwd:root,stdio:'inherit',shell:windows});const quoted=JSON.stringify(name),check='for(const specifier of['+quoted+','+JSON.stringify(name+'/tui')+']){const module=await import(specifier);if(module.default?.id!=='+quoted+'||typeof module.default?.tui!==\\\"function\\\")throw new Error(\\\"Invalid plugin export: \\\"+specifier)}';await writeFile(join(root,'smoke.mjs'),check);execFileSync(process.execPath,['smoke.mjs'],{cwd:root,stdio:'inherit'})}finally{await rm(root,{recursive:true,force:true})}\"",
     "pack:dry-run": "pnpm pack --dry-run",
     "audit:prod": "pnpm audit --prod"
   },
@@ -45,6 +45,7 @@
   "devDependencies": {
     "@opencode-ai/plugin": "1.17.18",
     "@opentui/core": "0.4.3",
+    "@opentui/keymap": "0.4.3",
     "@opentui/solid": "0.4.3",
     "@solidjs/testing-library": "^0.8.10",
     "@types/babel__core": "^7.20.5",
