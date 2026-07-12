@@ -2,113 +2,99 @@
 
 ## Purpose
 
-Define a standalone OpenCode TUI plugin that safely displays Codex and Claude CLI usage in the OpenCode sidebar without credential scraping, internal OpenCode patching, or Gentle-AI runtime ownership.
+Safe supported CLI quota display.
 
 ## Requirements
 
-### Requirement: Public Sidebar Plugin Surface
+### Requirement: Public Expandable Sidebar
 
-The plugin MUST register through public `@opencode-ai/plugin/tui` APIs and MUST render persistent `sidebar_content` alongside Context, MCP, and LSP. It MUST NOT register colliding host routes, monkey-patch internals, or require Gentle-AI to own runtime behavior.
+The plugin MUST use public `@opencode-ai/plugin/tui` APIs to render one persistent `sidebar_content` section titled `CLI Usage`. It MUST expand/collapse, default expanded, keep expansion in memory, write no files.
 
-#### Scenario: Sidebar content is rendered
+#### Scenario: Sidebar toggle
+- GIVEN the OpenCode sidebar renders
+- WHEN the user toggles `CLI Usage`
+- THEN the section expands or collapses via public TUI behavior
+- AND state remains session-local
 
-- GIVEN OpenCode loads the standalone plugin
-- WHEN the session sidebar renders
-- THEN the usage meter appears as a `sidebar_content` block beside existing sidebar sections
+### Requirement: Provider Availability Views
 
-#### Scenario: Unsupported host mutation is requested
+Collapsed view MUST show `1/2`-style availability when any supported provider has data, or exact `Data unavailable` when none do. Expanded view MUST list adapters: Codex, Claude, then future registered adapters. OpenCode-configured providers MUST NOT imply quota support.
 
-- GIVEN a feature requires arbitrary tabs, panels, status rows, or route replacement
-- WHEN the plugin evaluates that feature
-- THEN it MUST reject that behavior as out of scope
+#### Scenario: Mixed availability
+- GIVEN Codex has data and Claude is unavailable
+- WHEN the section is collapsed then expanded
+- THEN collapsed copy shows `1/2`
+- AND expanded rows remain provider-isolated
 
-### Requirement: Provider Probe Support
+### Requirement: Provider Windows
 
-The plugin MUST probe Codex via official CLI `/status` and Claude via official CLI `/usage` on Linux and macOS first. Windows MUST be reported unsupported in v1.
+Codex MUST expose 5h, weekly, and reset metadata from official `codex /status`. Claude MUST expose current/session 5h and weekly/all-model windows from official `claude /usage`. Claude per-model windows MAY render only when CLI-exposed.
 
-#### Scenario: Supported provider probe
+#### Scenario: Window normalization
+- GIVEN official CLI output exposes supported windows
+- WHEN provider data is normalized
+- THEN exposed windows render; absent windows are omitted, never fabricated
 
-- GIVEN Linux or macOS with an authenticated provider CLI
-- WHEN refresh runs for Codex or Claude
-- THEN the plugin invokes only the approved CLI command for that provider
+### Requirement: Refresh Isolation
 
-#### Scenario: Unsupported platform
+Manual refresh, public `usage.refresh`, and adaptive auto-refresh MUST refresh all supported providers with isolation, single-flight, cleanup, and rate/error gates. Cadence SHOULD remain near 2m recent, 5m active, 15m inactive, 30m constrained/inactive.
 
+#### Scenario: Partial refresh failure
+- GIVEN Codex succeeds and Claude fails
+- WHEN manual refresh or `usage.refresh` runs
+- THEN Codex remains available
+- AND Claude shows exact `Data unavailable`
+
+### Requirement: Safe CLI Boundary
+
+The plugin MUST run cancellable, timeout-bounded, shell-injection-safe probes with minimal environment and only official CLIs: `codex /status`, `claude /usage`. It MUST NOT access credentials, auth files, Keychain, cookies, tokens, provider APIs, private endpoints, or OpenCode auth state. Plain pipes MUST be first; PTY MAY be added only if RED proves required. Linux/macOS are supported; Windows MUST not execute commands.
+
+#### Scenario: Forbidden shortcut exists
+- GIVEN credentials or private endpoints exist locally
+- WHEN provider usage refreshes
+- THEN the plugin ignores them
+- AND invokes only the official CLI
+
+#### Scenario: Windows runtime
 - GIVEN the plugin runs on Windows
-- WHEN provider data is requested
-- THEN the provider display immediately shows `Data unavailable`
+- WHEN refresh is requested
+- THEN all providers show `Data unavailable` and no command executes
 
-### Requirement: Security Boundary
+### Requirement: Percent-Remaining Presentation
 
-The plugin MUST NOT read auth files, Keychain, browser cookies, raw tokens, undocumented provider endpoints, or OpenCode internal auth-state readers.
+Bars and labels MUST show percent remaining, clamp 0–100, include accessible text, and MAY include reset metadata. Unknown, failed, or stale data MUST NOT render zero.
 
-#### Scenario: Token-based shortcut is available
+#### Scenario: Out-of-range percent
+- GIVEN a parser returns -5 or 140 percent remaining
+- WHEN the provider row renders
+- THEN visible and accessible values are clamped to 0–100
 
-- GIVEN a provider token or auth file exists locally
-- WHEN the plugin refreshes usage
-- THEN it MUST ignore that credential source and use the provider CLI only
+### Requirement: Fail-Soft Data Contract
 
-### Requirement: Safe Probe Execution
+Missing CLI, unsupported platform/output, timeout, process error, parse failure, or gate denial MUST render exact `Data unavailable`. Stale values MUST be discarded.
 
-Provider probes MUST be cancellable, timeout-bounded, single-flight per provider, provider-isolated, shell-injection safe, and run with minimal environment exposure. PTY MAY be used only when plain pipes cannot obtain supported CLI output.
-
-#### Scenario: Probe overlaps or hangs
-
-- GIVEN a provider probe is already running or exceeds its timeout
-- WHEN another refresh starts or cancellation is requested
-- THEN no overlapping probe runs and the affected provider shows `Data unavailable`
-
-### Requirement: Normalized Usage Model
-
-The plugin MUST normalize provider, window, usage percentage, reset metadata, status, and last refresh time with deterministic provider ordering. It MUST NOT fabricate token counts when CLIs expose only percentages.
-
-#### Scenario: CLI returns percentage only
-
-- GIVEN a provider output includes usage percent but no token count
-- WHEN the model is normalized
-- THEN the UI shows percentage/reset metadata and omits token counts
-
-### Requirement: Refresh Policy and Failure Gates
-
-The plugin MUST support manual refresh plus adaptive automatic refresh near 2 minutes after recent interaction, 5 minutes active, 15 minutes inactive, and 30 minutes during prolonged inactivity or resource constraints. It MUST avoid overlapping probes and honor rate-limit/error gates.
-
-#### Scenario: Manual and adaptive refresh coexist
-
-- GIVEN the meter is visible
-- WHEN manual or scheduled refresh fires
-- THEN eligible providers refresh once and blocked providers remain gated
-
-### Requirement: Fail-Soft Display
-
-Missing CLI, unsupported platform/output, timeout, process error, parse failure, or rate-limit gate MUST immediately display exact copy `Data unavailable`. Stale values MUST be discarded and failures MUST NOT be represented as zero.
-
-#### Scenario: Previous value becomes stale
-
+#### Scenario: Stale value replaced
 - GIVEN a provider previously displayed usage
 - WHEN the next refresh fails
-- THEN the old usage is removed and `Data unavailable` is displayed
+- THEN the old value is removed
+- AND the provider shows `Data unavailable`, not zero
 
-### Requirement: Parser, Test, Accessibility, and Lifecycle Contract
+### Requirement: Mockable Acceptance and Lifecycle
 
-Parsers MUST be versioned and tolerant of additive CLI output changes. The package MUST include fixture/golden contract tests for provider outputs, readable/accessibility-safe sidebar presentation, and cleanup of timers, probes, and registrations on plugin disposal.
+Acceptance MUST use a deterministic in-process plugin behavior harness with fake Codex/Claude transport responses and no real credentials, network, private accounts, packed-package behavior, or fake executables. Disposal MUST clean timers, probes, registrations, commands, and session memory.
 
-#### Scenario: CLI output changes additively
-
-- GIVEN a fixture with extra non-breaking provider text
-- WHEN parser contract tests run
-- THEN supported fields still parse or the provider safely shows `Data unavailable`
-
-#### Scenario: Plugin is disposed
-
-- GIVEN OpenCode deactivates the plugin
-- WHEN disposal runs
-- THEN active probes, refresh timers, and sidebar registrations are cleaned up
+#### Scenario: Plugin behavior harness
+- GIVEN fake Codex and Claude transport responses emit fixtures
+- WHEN tests run in an in-process OpenCode/plugin harness importing the source TUI plugin
+- THEN registration, refresh, toggle, partial failure, and disposal are verified without credentials, network, fake executables, or packed-package behavior
 
 ## Acceptance Boundaries
 
-- Functional source of truth is this standalone package spec; Gentle-AI registration/recommendation is deferred and non-required.
-- Design MUST choose the package test runner because this standalone plugin is outside the Go-only repository runner.
+- PR3 covers UI, Claude, isolation, security, cleanup, and mockable acceptance.
+- Gentle-AI registration is deferred; PTY is RED-gated.
 
 ## Non-Goals
 
-- Windows v1 support, provider APIs, credential scraping, undocumented endpoints, internal route collisions, arbitrary OpenCode shell surfaces, native Gentle-AI runtime ownership, and implementation task planning.
+- Treating OpenCode configured providers as quota-supported.
+- Windows execution in v1.
+- Provider APIs, credential scraping, auth-state readers, private endpoints, route collisions, arbitrary shell surfaces, persisted expansion, task planning.

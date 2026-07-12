@@ -9,10 +9,10 @@ const SANITIZED_STATUS_FIXTURES = {
   c1Controls: "Usage: 42%\nResets in 1h\u009b31m\u009dunsafe\u009c 15m\u0085ignored",
 } as const;
 const SANITIZED_STATUS_GOLDENS = {
-  additive: { percentage: 42, reset: "1h 15m" },
-  boundaries: [{ percentage: 0 }, { percentage: 100 }],
-  malformedReset: { percentage: 42 },
-  c1Controls: { percentage: 42, reset: "1h 15mignored" },
+  additive: { windows: [{ label: "5h", percentRemaining: 42, reset: "1h 15m" }] },
+  boundaries: [{ windows: [{ label: "5h", percentRemaining: 0 }] }, { windows: [{ label: "5h", percentRemaining: 100 }] }],
+  malformedReset: { windows: [{ label: "5h", percentRemaining: 42 }] },
+  c1Controls: { windows: [{ label: "5h", percentRemaining: 42, reset: "1h 15mignored" }] },
 } as const;
 
 describe("Codex status parser v1", () => {

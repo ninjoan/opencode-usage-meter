@@ -30,6 +30,14 @@ async function readCiWorkflow(): Promise<string> {
   return readFile(workflowUrl, "utf8");
 }
 
+async function readWorkspacePolicy(): Promise<string> {
+  return readFile(new URL("../../pnpm-workspace.yaml", import.meta.url), "utf8");
+}
+
+async function readLockfile(): Promise<string> {
+  return readFile(new URL("../../pnpm-lock.yaml", import.meta.url), "utf8");
+}
+
 function expectRecord(value: unknown, label: string): Record<string, unknown> {
   expect(value, label).toBeTypeOf("object");
   expect(value, label).not.toBeNull();
@@ -75,6 +83,36 @@ describe("package export and runtime contract", () => {
     expect(scripts["smoke:consumer"]).not.toContain("tests/compat/consumer-smoke.mjs");
     expect(workflow).toContain("pnpm smoke:consumer");
     expect(workflow).not.toContain("pnpm smoke:built-package");
+  });
+
+  it("allows only the exact locked native PTY package build", async () => {
+    const packageJson = await readPackageJson();
+    const optionalDependencies = expectRecord(packageJson.optionalDependencies, "optionalDependencies");
+    const workspace = await readWorkspacePolicy();
+    const lockfile = await readLockfile();
+
+    expect(optionalDependencies["node-pty"]).toBe("1.1.0");
+    expect(lockfile).toMatch(/node-pty:\n\s+specifier: 1\.1\.0\n\s+version: 1\.1\.0/);
+    expect(workspace).toContain("  node-pty: true");
+    expect(workspace).toContain("  esbuild: true");
+    expect(workspace).toContain("  msgpackr-extract: true");
+    expect(workspace).not.toMatch(/dangerouslyAllowAllBuilds|onlyBuiltDependencies|neverBuiltDependencies/);
+    expect(workspace.match(/^\s{2}[\w-]+: true$/gm)).toHaveLength(3);
+  });
+
+  it("runs a credential-free native PTY smoke on Linux and macOS CI", async () => {
+    const packageJson = await readPackageJson();
+    const scripts = expectRecord(packageJson.scripts, "scripts");
+    const workflow = await readCiWorkflow();
+
+    expect(scripts["smoke:pty-native"]).toMatch(/^node --input-type=module -e "/);
+    expect(scripts["smoke:pty-native"]).toContain("import('node-pty')");
+    expect(scripts["smoke:pty-native"]).toContain("process.execPath");
+    expect(scripts["smoke:pty-native"]).toContain("terminal.kill()");
+    expect(workflow).toContain("os: [ubuntu-latest, macos-latest]");
+    expect(workflow).toContain("pnpm install --frozen-lockfile");
+    expect(workflow).toContain("pnpm smoke:pty-native");
+    expect(workflow).not.toMatch(/smoke:pty-native.*(?:TOKEN|API_KEY|SECRET)/);
   });
 
   it("exposes only the public TUI entry points", async () => {
