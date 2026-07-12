@@ -1,0 +1,54 @@
+schema: spec-driven
+
+context: |
+  Project: opencode-usage-meter
+  Repo state: PR1 package bootstrap present; provider/runtime slices deferred
+  Product: standalone OpenCode TUI plugin
+  Stack: TypeScript + Solid
+  Testing intent: Vitest + @solidjs/testing-library
+  Strict TDD: true (approved design)
+  Artifact store: hybrid
+  Planning transfer: proposal/spec/design/tasks imported; continue change artifacts in place
+
+strict_tdd: true
+
+testing:
+  source: PR1 package bootstrap and corrected design intent
+  framework: vitest
+  ui_integration_tool: "@solidjs/testing-library"
+  focused_test_command: "pnpm test -- --run <test-file>"
+  full_test_command: "pnpm test"
+  coverage_command: "pnpm test:coverage"
+  typecheck_command: "pnpm typecheck"
+  build_command: "pnpm build"
+  package_dry_run_command: "pnpm pack:dry-run"
+  lint_command: ""
+  format_command: ""
+  notes:
+    - Commands are executable after PR1 bootstrap and MUST be reported with exact run results.
+    - Component specs should use @solidjs/testing-library with jsdom fixtures and no real credentials.
+
+rules:
+  proposal:
+    - Reuse transferred planning artifacts from the Gentle-AI workspace; do not regenerate bootstrap-equivalent documents during init.
+  specs:
+    - Use Given/When/Then for scenarios.
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY).
+  design:
+    - Document plugin boundaries, usage metering flow, and rationale for any host integration assumptions.
+  tasks:
+    - Keep tasks small enough for strict TDD red-green-refactor cycles.
+  apply:
+    guidelines:
+      - Preserve strict TypeScript settings.
+      - Prefer focused Vitest execution before full suite runs.
+    tdd: true
+    test_command: "pnpm test -- --run <test-file>"
+  verify:
+    test_command: "pnpm test"
+    typecheck_command: "pnpm typecheck"
+    build_command: "pnpm build"
+    package_dry_run_command: "pnpm pack:dry-run"
+    coverage_threshold: 0
+  archive:
+    - Archive only after transferred specs/design/tasks and implementation verification are complete.
