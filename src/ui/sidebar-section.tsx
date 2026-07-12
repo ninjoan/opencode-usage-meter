@@ -1,0 +1,3 @@
+import { PROVIDER, USAGE_STATUS, type Provider, type UsageDisplay } from "../domain/usage.js";
+export type SidebarSection = readonly [string, string];
+export function renderSidebarSection(provider: Provider, usage: UsageDisplay): SidebarSection { const title = provider === PROVIDER.CODEX ? "Codex" : provider; if (usage.status === USAGE_STATUS.LOADING) return [title, "Loading…"]; if (usage.status !== USAGE_STATUS.AVAILABLE || usage.percentage === undefined) return [title, "Data unavailable"]; return [title, `${usage.percentage}%${usage.reset === undefined ? "" : ` · Resets ${usage.reset}`}`]; }
