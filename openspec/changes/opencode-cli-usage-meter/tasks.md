@@ -52,5 +52,5 @@ Chain strategy: stacked-to-main
 - [x] 3.8 RED/GREEN: replace defective `node-pty@1.1.0` with exact `1.2.0-beta.12`, authorize only its native build, prove no CI `chmod` workaround, preserve the consumer `--ignore-scripts` boundary, and wire Ubuntu/macOS native PTY smoke for a new review target. Linux is locally proven; macOS remains pending CI.
 
 ## Phase 4: Package Verification and Release Guard
-- [ ] 4.1 RED: add package export-shape/import, frozen install, `pnpm pack --dry-run`, and manifest/tag/npm consistency checks without claiming plugin behavior coverage from package smoke.
-- [ ] 4.2 GREEN/REFACTOR: make `pnpm {typecheck,test,build,audit:prod}` and `pnpm pack --dry-run` pass; stage semantic-release/npm provenance workflow/config.
+- [x] 4.1 RED: add package export-shape/import, frozen install, actual seven-entry `npm pack --json --dry-run --ignore-scripts`, and manifest/tag/npm consistency checks without claiming plugin behavior coverage from package smoke.
+- [x] 4.2 GREEN/REFACTOR: gate release on same-SHA Ubuntu package plus Ubuntu/macOS native checks; serialize repository/package release runs with stable workflow-level concurrency and `cancel-in-progress: false`; fail closed on npm E404; stage one-time manual bootstrap, trusted-publisher handoff, and non-destructive recovery guidance.
