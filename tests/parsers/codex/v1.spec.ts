@@ -9,10 +9,10 @@ const SANITIZED_STATUS_FIXTURES = {
   c1Controls: "Usage: 42%\nResets in 1h\u009b31m\u009dunsafe\u009c 15m\u0085ignored",
 } as const;
 const SANITIZED_STATUS_GOLDENS = {
-  additive: { percentage: 42, reset: "1h 15m" },
-  boundaries: [{ percentage: 0 }, { percentage: 100 }],
-  malformedReset: { percentage: 42 },
-  c1Controls: { percentage: 42, reset: "1h 15mignored" },
+  additive: { windows: [{ label: "5h", percentRemaining: 42, reset: "1h 15m" }] },
+  boundaries: [{ windows: [{ label: "5h", percentRemaining: 0 }] }, { windows: [{ label: "5h", percentRemaining: 100 }] }],
+  malformedReset: { windows: [{ label: "5h", percentRemaining: 42 }] },
+  c1Controls: { windows: [{ label: "5h", percentRemaining: 42, reset: "1h 15mignored" }] },
 } as const;
 
 describe("Codex status parser v1", () => {
@@ -24,5 +24,13 @@ describe("Codex status parser v1", () => {
   });
   it("rejects output without a stable percentage instead of fabricating usage", () => {
     expect(parseCodexStatus("Status is available\nResets tomorrow")).toBeUndefined();
+  });
+  it("validates the full percentage token and keeps valid lines from mixed output", () => {
+    for (const value of ["101%", "164%", "-1%", "64.5%"])
+      expect(parseCodexStatus(`Usage: ${value}\nResets tomorrow`)).toBeUndefined();
+
+    expect(parseCodexStatus("Usage: 164%\nWeekly limit: 72%\nResets in 2d")).toEqual({
+      windows: [{ label: "Weekly", percentRemaining: 72, reset: "2d" }],
+    });
   });
 });

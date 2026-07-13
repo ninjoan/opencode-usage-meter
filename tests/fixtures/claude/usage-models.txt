@@ -1,0 +1,4 @@
+Claude usage
+Session 5h: 88% remaining
+Weekly all models: 52% remaining
+Model Opus: 12% remaining

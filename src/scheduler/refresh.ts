@@ -1,4 +1,4 @@
-import { USAGE_STATUS, type Provider, type UsageSnapshot } from "../domain/usage.js";
+import { USAGE_STATUS, unavailableSnapshot, type Provider, type UsageSnapshot } from "../domain/usage.js";
 import type { ProviderGates } from "../gates/provider-gates.js";
 import type { UsageCache } from "../state/cache.js";
 export const REFRESH_INTERVAL = { ACTIVE: 5 * 60_000, IDLE: 15 * 60_000, RECENT_INTERACTION: 2 * 60_000, RESOURCE_CONSTRAINED: 30 * 60_000 } as const;
@@ -7,4 +7,80 @@ export type ActivityState = (typeof ACTIVITY_STATE)[keyof typeof ACTIVITY_STATE]
 export interface RefreshProvider { readonly provider: Provider; refresh(signal: AbortSignal): Promise<UsageSnapshot>; }
 export interface RefreshScheduler { dispose(): void; refreshNow(): Promise<void>; reschedule(activity: ActivityState): void; start(activity: ActivityState): void; stop(): void; }
 function interval(activity: ActivityState): number { return activity === ACTIVITY_STATE.RECENT_INTERACTION ? REFRESH_INTERVAL.RECENT_INTERACTION : activity === ACTIVITY_STATE.ACTIVE ? REFRESH_INTERVAL.ACTIVE : activity === ACTIVITY_STATE.INACTIVE || activity === ACTIVITY_STATE.IDLE ? REFRESH_INTERVAL.IDLE : REFRESH_INTERVAL.RESOURCE_CONSTRAINED; }
-export function createRefreshScheduler(providers: readonly RefreshProvider[], cache: UsageCache, gates: ProviderGates, now: () => number = () => Date.now()): RefreshScheduler { let timer: ReturnType<typeof setTimeout> | undefined; let controller: AbortController | undefined; let activity: ActivityState = ACTIVITY_STATE.INACTIVE; let disposed = false; const schedule = () => { if (disposed) return; if (timer !== undefined) clearTimeout(timer); timer = setTimeout(async () => { await refreshNow(); schedule(); }, interval(activity)); }; const refreshNow = async () => { for (const provider of providers) { if (!gates.tryOpen(provider.provider, now())) continue; controller = new AbortController(); try { const value = await provider.refresh(controller.signal); if (value.status === USAGE_STATUS.AVAILABLE) { cache.set(value); gates.reset(provider.provider); } else { cache.clear(provider.provider); gates.recordFailure(provider.provider, now(), value.retryAfterMs); } } catch { cache.clear(provider.provider); gates.recordFailure(provider.provider, now()); } finally { gates.close(provider.provider); controller = undefined; } } }; return { refreshNow, start(next) { activity = next; schedule(); }, reschedule(next) { activity = next; schedule(); }, stop() { if (timer !== undefined) clearTimeout(timer); timer = undefined; }, dispose() { if (disposed) return; disposed = true; this.stop(); controller?.abort(); } }; }
+export function createRefreshScheduler(
+  providers: readonly RefreshProvider[],
+  cache: UsageCache,
+  gates: ProviderGates,
+  now: () => number = () => Date.now(),
+  onSnapshot?: (snapshot: UsageSnapshot) => void
+): RefreshScheduler {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const controllers = new Map<Provider, AbortController>();
+  let activity: ActivityState = ACTIVITY_STATE.INACTIVE;
+  let running = false;
+  let disposed = false;
+
+  const refreshProvider = async (provider: RefreshProvider) => {
+    if (disposed || !gates.tryOpen(provider.provider, now())) return;
+    const controller = new AbortController();
+    controllers.set(provider.provider, controller);
+    try {
+      const value = await provider.refresh(controller.signal);
+      if (value.status === USAGE_STATUS.AVAILABLE && value.windows.length > 0) {
+        cache.set(value);
+        gates.reset(provider.provider);
+      } else {
+        cache.clear(provider.provider);
+        gates.recordFailure(provider.provider, now(), value.retryAfterMs);
+      }
+      onSnapshot?.(value);
+    } catch {
+      cache.clear(provider.provider);
+      gates.recordFailure(provider.provider, now());
+      onSnapshot?.(unavailableSnapshot(provider.provider, now()));
+    } finally {
+      gates.close(provider.provider);
+      controllers.delete(provider.provider);
+    }
+  };
+
+  const refreshNow = async () => {
+    await Promise.all(providers.map(refreshProvider));
+  };
+
+  const schedule = () => {
+    if (disposed || !running) return;
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(async () => {
+      timer = undefined;
+      await refreshNow();
+      schedule();
+    }, interval(activity));
+  };
+
+  return {
+    refreshNow,
+    start(next) {
+      if (disposed) return;
+      activity = next;
+      running = true;
+      schedule();
+    },
+    reschedule(next) {
+      activity = next;
+      schedule();
+    },
+    stop() {
+      running = false;
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      this.stop();
+      for (const controller of controllers.values()) controller.abort();
+      controllers.clear();
+    }
+  };
+}
