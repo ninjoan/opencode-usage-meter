@@ -1,16 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { createUsageMeterTuiPlugin } from "../../src/tui.js";
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
 import type { SafeProcessTransport } from "../../src/transport/process.js";
+
+vi.mock("@opentui/solid/jsx-runtime", () => ({
+  jsx: (type: string, props: object) => ({ type, props }),
+  jsxs: (type: string, props: object) => ({ type, props })
+}));
+
+const { createUsageMeterTuiPlugin } = await import("../../src/tui.js");
 
 function createPublicApi() {
   const listeners = new Map<string, Array<() => void>>();
   const unsubscribes = Array.from({ length: 6 }, () => vi.fn());
   let unsubscribeIndex = 0;
-  const registrationCleanup = vi.fn();
-  const register = vi.fn(() => registrationCleanup);
+  const register = vi.fn((slot: unknown) => { void slot; return "usage-meter-sidebar-slot"; });
   const api = { slots: { register }, keymap: { registerLayer: () => unsubscribes[unsubscribeIndex++]! }, event: { on: (type: string, listener: () => void) => { listeners.set(type, [...(listeners.get(type) ?? []), listener]); return unsubscribes[unsubscribeIndex++]!; } }, lifecycle: { signal: new AbortController().signal, onDispose: (listener: () => void) => { listeners.set("dispose", [...(listeners.get("dispose") ?? []), listener]); return unsubscribes[unsubscribeIndex++]!; } } } as unknown as TuiPluginApi;
-  return { api, listeners, register, registrationCleanup, unsubscribes };
+  return { api, listeners, register, unsubscribes };
 }
 
 describe("usage meter lifecycle", () => {
@@ -24,7 +29,9 @@ describe("usage meter lifecycle", () => {
     fake.listeners.get("dispose")?.forEach((listener) => listener());
     await Promise.resolve(); await Promise.resolve();
     expect(fake.register).toHaveBeenCalledOnce();
-    expect(fake.registrationCleanup).toHaveBeenCalledOnce();
+    const registered = fake.register.mock.calls[0]?.[0] as { slots: { sidebar_content: () => { props: { children: readonly [{ props: object }, { props: { children: () => string } }] } } } };
+    const sidebar = registered.slots.sidebar_content();
+    expect(sidebar.props.children[1].props.children()).toBe("Data unavailable");
     expect(receivedSignal?.aborted).toBe(true);
     expect(fake.unsubscribes).toHaveLength(6);
     for (const unsubscribe of fake.unsubscribes) expect(unsubscribe).toHaveBeenCalledOnce();

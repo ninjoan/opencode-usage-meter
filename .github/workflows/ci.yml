@@ -26,3 +26,29 @@ jobs:
 
       - name: Validate package
         run: pnpm typecheck && pnpm test && pnpm build && pnpm smoke:consumer && pnpm audit:prod && pnpm pack:dry-run
+
+  native-pty:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+
+      - name: Enable pinned pnpm
+        run: npm install --global corepack@0.34.7 && corepack enable && corepack prepare pnpm@11.2.0 --activate
+
+      - name: Install dependencies with allowBuilds policy
+        run: pnpm install --frozen-lockfile
+
+      - name: Load, spawn, and terminate native PTY
+        run: pnpm smoke:pty-native
+
+      - name: Exercise production PTY transport and Claude fallback
+        run: USAGE_METER_NATIVE_PTY=1 pnpm vitest run tests/transport/pty-decision.spec.ts

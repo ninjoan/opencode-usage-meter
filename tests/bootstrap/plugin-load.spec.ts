@@ -11,6 +11,7 @@ import plugin, {
   renderUnavailableUsage
 } from "../../src/tui.js";
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui";
+import { PROCESS_STATUS } from "../../src/transport/process.js";
 import { assertFixtureTextIsSafe } from "../support/fixture-policy.js";
 
 interface RegisteredSidebarContent { readonly id: string; readonly slots: { readonly sidebar_content: () => unknown }; }
@@ -64,22 +65,35 @@ describe("OpenCode TUI plugin load contract", () => {
   });
 
   it("refreshes provider display through the registered public manual action", async () => {
-    const run = vi.fn().mockResolvedValue({ status: "success", output: "Usage: 42%\nResets in 1h" });
+    let codexOutput = "5h usage: 42% remaining · resets in 1h\nWeekly usage: 77% remaining · resets Sunday";
+    let claudeOutput = "Session 5h: 64% remaining · resets in 2h\nWeekly all models: 21% remaining\nModel Opus: 12% remaining";
+    const run = vi.fn(({ executable }: { executable: string }) => Promise.resolve({ status: PROCESS_STATUS.SUCCESS, output: executable === "codex" ? codexOutput : claudeOutput }));
+    const ptyRun = vi.fn().mockResolvedValue({ status: PROCESS_STATUS.UNAVAILABLE, output: "" });
     const fake = createFakeTuiApi();
-    await createUsageMeterTuiPlugin({ platform: "linux", transport: { run } }).tui(fake.api, undefined, {} as never);
-    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce());
-    await vi.waitFor(() => expect((fake.registrations[0]!.slots.sidebar_content() as { props: { children: readonly [{ props: object }, { props: { children: () => string } }] } }).props.children[1].props.children()).toContain("42%"));
-    run.mockResolvedValueOnce({ status: "success", output: "Usage: 73%\nResets in 2h" });
+    await createUsageMeterTuiPlugin({ platform: "linux", transport: { run }, ptyTransport: { run: ptyRun } }).tui(fake.api, undefined, {} as never);
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect((fake.registrations[0]!.slots.sidebar_content() as { props: { children: readonly [{ props: object }, { props: { children: () => string } }] } }).props.children[1].props.children()).toContain("Weekly 77%"));
+    await Promise.all(run.mock.results.map((result) => result.value));
+    await Promise.resolve();
+    codexOutput = "5h usage: 73% remaining · resets in 2h\nWeekly usage: 44% remaining";
+    claudeOutput = "No quota";
 
-    expect(fake.commands).toHaveLength(1);
+    expect(fake.commands.map((command) => command.name)).toEqual(["usage.refresh", "usage.toggle"]);
     expect(fake.commands[0]).toMatchObject({ name: "usage.refresh", title: "Refresh CLI usage" });
     await fake.commands[0]!.run();
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(4));
 
     const rendered = fake.registrations[0]!.slots.sidebar_content() as { props: { children: readonly [{ props: object }, { props: { children: () => string } }] } };
-    expect(rendered.props.children[1].props.children()).toBe("Codex: 73% · Resets 2h");
-    run.mockResolvedValueOnce({ status: "success", output: "malformed" });
+    expect(rendered.props.children[1].props.children()).toContain("Codex");
+    expect(rendered.props.children[1].props.children()).toContain("5h 73% · Resets 2h");
+    expect(rendered.props.children[1].props.children()).toContain("Weekly 44%");
+    expect(rendered.props.children[1].props.children()).toContain("Claude: Data unavailable");
+    await fake.commands[1]!.run();
+    expect(rendered.props.children[1].props.children()).toBe("1/2");
+    codexOutput = "malformed";
     await fake.commands[0]!.run();
     expect(rendered.props.children[1].props.children()).toBe("Data unavailable");
+    expect(ptyRun).toHaveBeenCalledOnce();
     fake.dispose();
     fake.dispose();
   });
@@ -109,7 +123,7 @@ describe("OpenCode TUI plugin load contract", () => {
     await Promise.resolve();
     expect(fake.registrations).toHaveLength(1);
     const rendered = fake.registrations[0]!.slots.sidebar_content() as { props: { children: readonly [{ props: { children: string } }, { props: { children: () => string } }] } };
-    expect(rendered.props.children[1].props.children()).toBe("Data unavailable");
+    expect(rendered.props.children[1].props.children()).toBe("Codex: Data unavailable\nClaude: Data unavailable");
     expect(run).not.toHaveBeenCalled();
     fake.dispose();
   });
