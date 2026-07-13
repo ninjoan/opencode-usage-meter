@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-ninjoan-opencode-usage-meter-opencode-cli-usage-meter
+  cancel-in-progress: false
+
+jobs:
+  package-validation:
+    name: package
+    if: github.repository == 'ninjoan/opencode-usage-meter'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify exact release commit
+        run: test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+      - name: Enable pinned pnpm
+        run: npm install --global corepack@0.34.7 && corepack enable && corepack prepare pnpm@11.2.0 --activate
+      - name: Install without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Validate package
+        run: pnpm typecheck && pnpm test && pnpm build && pnpm smoke:consumer && pnpm audit:prod && pnpm pack:dry-run && pnpm release:guard
+
+  native-pty-validation:
+    name: native-pty (${{ matrix.os }})
+    if: github.repository == 'ninjoan/opencode-usage-meter'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify exact release commit
+        run: test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+      - name: Enable pinned pnpm
+        run: npm install --global corepack@0.34.7 && corepack enable && corepack prepare pnpm@11.2.0 --activate
+      - name: Install dependencies with native build policy
+        run: pnpm install --frozen-lockfile
+      - name: Validate native PTY
+        run: pnpm smoke:pty-native && USAGE_METER_NATIVE_PTY=1 pnpm vitest run tests/transport/pty-decision.spec.ts
+
+  release:
+    if: github.repository == 'ninjoan/opencode-usage-meter'
+    needs: [package-validation, native-pty-validation]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/opencode-cli-usage-meter
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact release commit
+        run: test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+          registry-url: https://registry.npmjs.org
+
+      - name: Install exact npm and pinned pnpm
+        run: npm install --global npm@11.5.1 corepack@0.34.7 && test "$(npm --version)" = "11.5.1" && corepack enable && corepack prepare pnpm@11.2.0 --activate
+
+      - name: Install dependencies with native build policy
+        run: pnpm install --frozen-lockfile
+
+      - name: Guard automated release
+        run: pnpm build && pnpm release:guard
+        env:
+          RELEASE_GUARD_REQUIRE_PUBLISHED: "true"
+
+      - name: Publish via semantic-release
+        run: pnpm release
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
