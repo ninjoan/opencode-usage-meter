@@ -88,10 +88,33 @@ Acceptance MUST use a deterministic in-process plugin behavior harness with fake
 - WHEN tests run in an in-process OpenCode/plugin harness importing the source TUI plugin
 - THEN registration, refresh, toggle, partial failure, and disposal are verified without credentials, network, fake executables, or packed-package behavior
 
+### Requirement: Manual Release Readiness
+
+The current release-readiness scope MUST NOT include automated GitHub publishing, release workflow OIDC, long-lived npm tokens, Semantic Release config, or dynamic release downloader scripts. CI MUST remain read-only, build before dist-dependent tests/guards, keep package export/archive checks, run Ubuntu and macOS native PTY validation, and run the read-only release guard.
+
+#### Scenario: Manual release guard
+- GIVEN a clean reviewed main SHA with successful package and native check evidence
+- WHEN `pnpm release:guard` runs
+- THEN it validates package identity, exact reviewed release version, exact seven-file npm pack allowlist, no bundled dependencies, reviewed SHA/check evidence, and nonmutation
+- AND it allows npm `E404` before the first publish while rejecting an already-published intended version
+
+#### Scenario: Manual publication and tag order
+- GIVEN maintainers choose the first release version `0.1.0` or a later explicit semver
+- WHEN they publish from an ephemeral clean release worktree
+- THEN they set the intended version without creating a git tag, retain and inspect the candidate `.tgz`, publish that exact tarball with local npm login and 2FA using `npm publish "$CANDIDATE_TGZ" --access public` without provenance for the first bootstrap release, and create the signed or annotated tag only after the downloaded registry tarball matches the retained candidate
+
+#### Scenario: Release recovery
+- GIVEN npm publication succeeds but tag creation or artifact verification fails
+- WHEN maintainers compare registry and local artifacts
+- THEN a matching artifact MAY receive the missing tag at the exact reviewed SHA
+- AND any mismatch or bad immutable version MUST be deprecated and fixed forward with a successor version, never unpublished
+- AND a timeout or lost publish response MUST query npm for the version and compare any existing registry tarball before any retry; it MUST never blindly republish
+
 ## Acceptance Boundaries
 
 - PR3 covers UI, Claude, isolation, security, cleanup, and mockable acceptance.
 - Gentle-AI registration is deferred; PTY is RED-gated.
+- Phase 4 covers manual release readiness only; future automation is deferred to a separate reviewed change after package creation.
 
 ## Non-Goals
 

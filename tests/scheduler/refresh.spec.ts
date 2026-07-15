@@ -42,6 +42,20 @@ describe("Codex refresh scheduler", () => {
     await scheduled;
     expect(refresh).toHaveBeenCalledOnce();
   });
+  it("discards an abort-ignoring provider result after disposal", async () => {
+    let complete: ((value: UsageSnapshot) => void) | undefined;
+    const cache = createUsageCache();
+    const onSnapshot = vi.fn();
+    const scheduler = createRefreshScheduler([{ provider: PROVIDER.CODEX, refresh: vi.fn(() => new Promise<UsageSnapshot>((resolve) => { complete = resolve; })) }], cache, createProviderGates(), () => 1, onSnapshot);
+    const refresh = scheduler.refreshNow();
+
+    scheduler.dispose();
+    complete?.({ provider: PROVIDER.CODEX, label: PROVIDER_LABEL[PROVIDER.CODEX], status: USAGE_STATUS.AVAILABLE, windows: [{ label: "5h", percentRemaining: 42 }], refreshedAt: 1 });
+    await refresh;
+
+    expect(cache.get(PROVIDER.CODEX)).toBeUndefined();
+    expect(onSnapshot).not.toHaveBeenCalled();
+  });
   it("does not reschedule an in-flight refresh after stop", async () => {
     vi.useFakeTimers();
     let complete: ((value: UsageSnapshot) => void) | undefined;
@@ -110,5 +124,33 @@ describe("Codex refresh scheduler", () => {
     expect(cache.get(PROVIDER.CODEX)).toEqual(codex);
     expect(cache.get(PROVIDER.CLAUDE)).toBeUndefined();
     expect(snapshots.at(-1)).toEqual({ provider: PROVIDER.CLAUDE, label: PROVIDER_LABEL[PROVIDER.CLAUDE], status: USAGE_STATUS.UNAVAILABLE, windows: [], refreshedAt: 2 });
+  });
+  it("diagnoses rejected refreshes with bounded structured fields", async () => {
+    const diagnostic = vi.fn(); let time = 0;
+    const scheduler = createRefreshScheduler([{ provider: PROVIDER.CODEX, refresh: vi.fn().mockRejectedValue(new Error("token=secret /private/key")) }], createUsageCache(), createProviderGates(), () => time += 7, undefined, diagnostic);
+    await scheduler.refreshNow();
+    expect(diagnostic).toHaveBeenCalledWith({ provider: PROVIDER.CODEX, stage: "probe", durationMs: 7, category: "failed" });
+    expect(JSON.stringify(diagnostic.mock.calls)).not.toMatch(/secret|private/);
+  });
+  it("isolates throwing diagnostics and snapshot hooks", async () => {
+    const onSnapshot = vi.fn(() => { throw new Error("snapshot secret"); });
+    const diagnostic = vi.fn(() => { throw new Error("diagnostic secret"); });
+    const scheduler = createRefreshScheduler([{ provider: PROVIDER.CODEX, refresh: vi.fn().mockRejectedValue(new Error("provider secret")) }], createUsageCache(), createProviderGates(), () => 2, onSnapshot, diagnostic);
+
+    await expect(scheduler.refreshNow()).resolves.toBeUndefined();
+    expect(diagnostic).toHaveBeenCalledOnce();
+    expect(onSnapshot).toHaveBeenCalledWith(expect.objectContaining({ provider: PROVIDER.CODEX, status: USAGE_STATUS.UNAVAILABLE }));
+  });
+  it("rearms scheduled refresh after hooks throw", async () => {
+    vi.useFakeTimers();
+    const refresh = vi.fn().mockResolvedValue({ provider: PROVIDER.CODEX, label: PROVIDER_LABEL[PROVIDER.CODEX], status: USAGE_STATUS.AVAILABLE, windows: [{ label: "5h", percentRemaining: 42 }], refreshedAt: 1 });
+    const scheduler = createRefreshScheduler([{ provider: PROVIDER.CODEX, refresh }], createUsageCache(), createProviderGates(), () => 1, () => { throw new Error("snapshot"); });
+    scheduler.start(ACTIVITY_STATE.ACTIVE);
+
+    await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL.ACTIVE * 2);
+
+    expect(refresh).toHaveBeenCalledTimes(2);
+    scheduler.dispose();
+    vi.useRealTimers();
   });
 });
