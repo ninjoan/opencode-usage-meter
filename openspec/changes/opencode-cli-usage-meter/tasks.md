@@ -51,6 +51,6 @@ Chain strategy: stacked-to-main
 - [x] 3.7 RED/GREEN: add `tests/compat/plugin-behavior-harness.spec.ts` deterministic in-process plugin behavior harness with fake Codex/Claude transport; cover registration, refresh, toggle, partial failure, and disposal without real credentials/network, fake executables, or packed-package execution.
 - [x] 3.8 RED/GREEN: replace defective `node-pty@1.1.0` with exact `1.2.0-beta.12`, authorize only its native build, prove no CI `chmod` workaround, preserve the consumer `--ignore-scripts` boundary, and wire Ubuntu/macOS native PTY smoke for a new review target. Linux is locally proven; macOS remains pending CI.
 
-## Phase 4: Package Verification and Release Guard
-- [ ] 4.1 RED: add package export-shape/import, frozen install, `pnpm pack --dry-run`, and manifest/tag/npm consistency checks without claiming plugin behavior coverage from package smoke.
-- [ ] 4.2 GREEN/REFACTOR: make `pnpm {typecheck,test,build,audit:prod}` and `pnpm pack --dry-run` pass; stage semantic-release/npm provenance workflow/config.
+## Phase 4: Manual Package Verification and Release Guard
+- [x] 4.1 RED: replace automated release contracts with behavior-first manual release guard tests for absent release workflow/config/scripts, allowed pre-first-publish npm E404, existing version collision rejection, exact pack allowlist/bundle rejection, clean reviewed SHA/check evidence, and nonmutation.
+- [x] 4.2 GREEN/REFACTOR: remove current-scope Semantic Release/OIDC publishing files and dynamic release scripts; keep CI package/native Ubuntu+macOS checks, least privilege, build-before-test, stable package checks, and a manual retained-`.tgz` publish runbook with no first-release provenance, candidate-vs-registry comparison, ambiguous-publish recovery, and post-publish tag/integrity rules.

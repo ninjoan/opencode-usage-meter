@@ -1,9 +1,17 @@
 {
   "name": "opencode-cli-usage-meter",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Standalone OpenCode TUI plugin that displays CLI usage in the sidebar.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ninjoan/opencode-usage-meter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ninjoan/opencode-usage-meter/issues"
+  },
+  "homepage": "https://github.com/ninjoan/opencode-usage-meter#readme",
   "main": "./dist/tui.js",
   "types": "./dist/tui.d.ts",
   "exports": {
@@ -27,6 +35,9 @@
   },
   "packageManager": "pnpm@11.2.0",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -35,7 +46,9 @@
     "smoke:pty-native": "node --input-type=module -e \"const{spawn}=await import('node-pty');const terminal=spawn(process.execPath,['-e','setTimeout(()=>{},30000)'],{cols:80,rows:24,cwd:process.cwd(),env:{PATH:process.env.PATH??''},name:'xterm'});await new Promise((resolve,reject)=>{let settled=false;const finish=(error)=>{if(settled)return;settled=true;clearTimeout(killTimer);clearTimeout(watchdog);error?reject(error):resolve()};const killTimer=setTimeout(()=>terminal.kill(),100);const watchdog=setTimeout(()=>finish(new Error('PTY smoke did not terminate')),5000);terminal.onExit(()=>finish());terminal.onData(()=>{})})\"",
     "smoke:consumer": "node --input-type=module -e \"import{execFileSync}from'node:child_process';import{mkdtemp,rm,writeFile}from'node:fs/promises';import{tmpdir}from'node:os';import{join}from'node:path';const name='opencode-cli-usage-meter',windows=process.platform==='win32',npm=windows?'npm.cmd':'npm',root=await mkdtemp(join(tmpdir(),'usage-meter-consumer-'));try{const[{filename}]=JSON.parse(execFileSync(npm,['pack','--json','--ignore-scripts','--pack-destination',root],{encoding:'utf8',shell:windows}));await writeFile(join(root,'package.json'),JSON.stringify({private:true,type:'module'}));execFileSync(npm,['install','--ignore-scripts',join(root,filename)],{cwd:root,stdio:'inherit',shell:windows});const quoted=JSON.stringify(name),check='for(const specifier of['+quoted+','+JSON.stringify(name+'/tui')+']){const module=await import(specifier);if(module.default?.id!=='+quoted+'||typeof module.default?.tui!==\\\"function\\\")throw new Error(\\\"Invalid plugin export: \\\"+specifier)}';await writeFile(join(root,'smoke.mjs'),check);execFileSync(process.execPath,['smoke.mjs'],{cwd:root,stdio:'inherit'})}finally{await rm(root,{recursive:true,force:true})}\"",
     "pack:dry-run": "pnpm pack --dry-run",
-    "audit:prod": "pnpm audit --prod"
+    "audit:prod": "pnpm audit --prod",
+    "release:guard": "node scripts/release-guard.mjs --package-only",
+    "release:verify": "node scripts/release-guard.mjs"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.17.18 <2",

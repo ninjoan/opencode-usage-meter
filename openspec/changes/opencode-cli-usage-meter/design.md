@@ -1,4 +1,4 @@
-# Design: OpenCode CLI Usage Meter — Phase 3 / PR3
+# Design: OpenCode CLI Usage Meter — Phase 3 / Phase 4
 
 ## Technical Approach
 
@@ -52,6 +52,17 @@ Use TypeScript const-object unions and flat interfaces. Core contract: adapter `
 | Package smoke | Package export-shape/import validation | `pnpm smoke:consumer` packs into a temporary consumer and imports the package root plus `/tui`; it does not exercise plugin behavior. |
 | Native PTY smoke | Optional native runtime | Clean frozen install followed by dynamic import, harmless local Node PTY spawn, and termination on Ubuntu/macOS CI; no provider credentials or network runtime. |
 
+## Phase 4 Manual Release Strategy
+
+| Area | Decision | Rationale |
+|---|---|---|
+| Publishing scope | Remove current-scope automated publishing files and scripts. Keep only `pnpm release:guard` as a read-only local/CI validation command. | The package does not exist yet; manual first release avoids privileged automation and bootstrap ambiguity. |
+| CI readiness | Keep read-only CI package validation, build-before-test ordering, archive/export checks, production audit, frozen installs, consumer smoke, and Ubuntu/macOS native PTY smoke. | Reviewers still need stable package/native evidence without granting publish authority to GitHub. |
+| Guard behavior | Validate package identity, exact reviewed intended version and collision checks, exact seven-file pack allowlist, no bundles, reviewed SHA/check evidence, and nonmutation. | The guard proves release readiness and blocks wrong-version, wrong-SHA, dirty-tree, archive, and version-collision failures without publishing. |
+| Manual first release | From exact merged `main` SHA containing reviewed version `0.1.0` after package and native checks pass: clean ephemeral worktree, build/test/guard/audit, generate and retain the candidate `.tgz`, local npm login+2FA, `npm publish "$CANDIDATE_TGZ" --access public`, then download and compare the registry tarball byte-for-byte before the signed/annotated tag. | The first manual bootstrap intentionally has no npm provenance because local publish cannot produce it; publishing the inspected tarball and comparing the registry artifact prevents premature tags while keeping credentials off GitHub. |
+| Future releases | Later versions use maintainer-selected semver and the same manual SHA/check/pack/integrity flow. Automation is a separate future change after the package exists. | Avoids encoding unreviewed automation assumptions into this readiness slice. |
+| Recovery | If publish succeeds but tag fails, compare the registry tarball to the retained candidate before creating the missing tag. If publish times out or the response is lost, query npm and compare any existing artifact before retrying the same candidate. Bad immutable versions are deprecated and fixed forward; unpublish is not used. | npm artifacts are immutable; recovery must preserve auditability and never blindly republish. |
+
 ## Threat Matrix
 
 | Boundary | Applicability | Design response | Planned RED tests |
@@ -65,7 +76,7 @@ Use TypeScript const-object unions and flat interfaces. Core contract: adapter `
 
 ## Migration / Rollout
 
-Migrate current Codex `percentage/reset` cache and signal to normalized provider snapshots; stale values are discarded on first PR3 refresh. Rollback is removing the plugin from `tui.json` or reverting PR3 files. Packaging now includes exact optional `node-pty@1.2.0-beta.12` and a bounded native-build policy; no release automation is included. The old escalated/correction review authority remains historical and unchanged; this packaging authorization prepares a new review target.
+Migrate current Codex `percentage/reset` cache and signal to normalized provider snapshots; stale values are discarded on first PR3 refresh. Rollback is removing the plugin from `tui.json` or reverting PR3 files. Packaging now includes exact optional `node-pty@1.2.0-beta.12` and a bounded native-build policy. Phase 4 deliberately keeps release publication manual and excludes automated GitHub publishing from the current scope. The old escalated/correction review authority remains historical and unchanged; this packaging authorization prepares a new review target.
 
 ## Open Questions / Risks
 

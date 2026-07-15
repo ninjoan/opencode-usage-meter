@@ -28,4 +28,15 @@ describe("Codex provider", () => {
     await expect(provider.refresh()).resolves.toEqual({ provider: PROVIDER.CODEX, label: PROVIDER_LABEL[PROVIDER.CODEX], status: USAGE_STATUS.UNAVAILABLE, windows: [], refreshedAt: 1234 });
     expect(run).not.toHaveBeenCalled();
   });
+  it("emits sanitized structured parse diagnostics", async () => {
+    const diagnostic = vi.fn();
+    const provider = createCodexProvider({ run: vi.fn().mockResolvedValue({ status: PROCESS_STATUS.SUCCESS, output: "token=secret /home/user/key" }) } satisfies SafeProcessTransport, (() => { let value = 5; return () => value += 5; })(), "linux", diagnostic);
+    await provider.refresh();
+    expect(diagnostic).toHaveBeenCalledWith({ provider: PROVIDER.CODEX, stage: "parse", durationMs: 5, category: "malformed" });
+    expect(JSON.stringify(diagnostic.mock.calls)).not.toMatch(/secret|\/home\/user/);
+  });
+  it("returns unavailable when the diagnostic sink throws", async () => {
+    const provider = createCodexProvider({ run: vi.fn().mockResolvedValue({ status: PROCESS_STATUS.SUCCESS, output: "unknown" }) } satisfies SafeProcessTransport, () => 1234, "linux", () => { throw new Error("sink failed"); });
+    await expect(provider.refresh()).resolves.toEqual({ provider: PROVIDER.CODEX, label: PROVIDER_LABEL[PROVIDER.CODEX], status: USAGE_STATUS.UNAVAILABLE, windows: [], refreshedAt: 1234 });
+  });
 });
